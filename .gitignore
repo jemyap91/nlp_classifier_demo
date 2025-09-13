@@ -13,7 +13,7 @@ cache/
 results/
 logs/
 distilbert_project_types/
-# my_finetuned_classifier/
+my_finetuned_classifier/
 
 # Large model/data files
 *.parquet
