@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  nlp-classifier:
+    build: .
+    ports:
+      - "8081:8501"
+    volumes:
+      # Mount data directory for Excel files
+      - ./data:/app/data:ro
+      # Mount cache directory for persistence
+      - ./cache:/app/cache
+      # Mount results directory for output
+      - ./results:/app/results
+      # Mount model directory (if you have a trained model)
+      - ./my_finetuned_classifier:/app/my_finetuned_classifier:ro
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 120s
+      retries: 5
+      start_period: 300s

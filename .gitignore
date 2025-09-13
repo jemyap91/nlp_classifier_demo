@@ -1,0 +1,24 @@
+# Python noise
+__pycache__/
+*.py[cod]
+.venv/
+.env
+
+# VS Code / notebooks
+.vscode/
+.ipynb_checkpoints/
+
+# Generated artifacts & model dirs
+cache/
+results/
+logs/
+distilbert_project_types/
+# my_finetuned_classifier/
+
+# Large model/data files
+*.parquet
+*.pt
+*.bin
+*.safetensors
+*.csv   # <-- this keeps your big CSVs out of the repo
+my_finetuned_classifier/model.onnx

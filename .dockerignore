@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Documentation
+README.md
+*.md
+
+# Temporary files
+temp_file.xlsx
+*.tmp
+*.log
+
+# Cache directories
+cache/
+__pycache__/
+
+# Model checkpoints (if large, consider using volumes)
+# my_finetuned_classifier/
+
+# Data files (if large)
+data/
+*.xlsx
+*.xls
+*.csv
+
+# Training scripts (not needed for inference)
+DistilBert.py
