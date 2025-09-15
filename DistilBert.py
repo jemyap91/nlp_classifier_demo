@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import evaluate
 
-from data_extraction import extract_all #importing from data extraction script
+from data_extraction_model_training import extract_all #importing from data extraction script
 
 from datasets import Dataset
 import evaluate

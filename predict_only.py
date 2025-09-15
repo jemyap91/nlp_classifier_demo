@@ -11,7 +11,7 @@ from transformers import (
     AutoConfig, Trainer, DataCollatorWithPadding
 )
 
-from data_extraction import extract_all  # your existing extractor
+from data_extraction_model_training import extract_all  # your existing extractor
 
 CKPT_DIR = "./my_finetuned_classifier"                   # saved model folder
 CACHE_PARQUET = Path("cache/cleaned_dataset.parquet")    # your cleaned cache

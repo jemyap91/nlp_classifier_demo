@@ -19,7 +19,7 @@ import plotly.graph_objects as go
 from typing import List, Tuple, Dict
 
 # Import data extraction
-from data_extraction import read_file as original_read_file
+from data_extraction_model_training import read_file as original_read_file
 
 # ==================== CONFIGURATION ====================
 CKPT_DIR = "./my_finetuned_classifier"
