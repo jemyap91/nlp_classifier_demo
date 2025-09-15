@@ -28,7 +28,7 @@ def normalize(name: str) -> str:
     - 'ProjectTitle'  -> 'projecttitle'
     - 'Project_Type'  -> 'projecttype'
     - 'Client'        -> 'client'
-    - 'Gross Fee (USD)' -> 'grossfeeusd'
+    - 'Gross Fee Yet To Be Earned (USD)' -> 'grossfeeyettobeearnedusd'
     """
     if name is None or type(name) is not str:
         return ""
@@ -50,11 +50,11 @@ def find_header_row(df_no_header):
     return None  # not found
 
 # --- NEW: aliases + parser for Project Value (Gross Fee, USD)
-FEE_ALIASES_USD = {
-    "grossfeeusd", "projectvalueusd", "contractvalueusd", "feeusd",
-    "grossfeesusd", "grossfeeinusd", "grossfeeus$", "grossfee$", "usdfee"
-}
-FEE_ALIASES_GENERIC = {"grossfee", "projectvalue", "contractvalue", "fee"}
+# FEE_ALIASES_USD = {
+#     "grossfeeusd", "projectvalueusd", "contractvalueusd", "feeusd",
+#     "grossfeesusd", "grossfeeinusd", "grossfeeus$", "grossfee$", "usdfee"
+# }
+# FEE_ALIASES_GENERIC = {"grossfee", "projectvalue", "contractvalue", "fee"}
 
 def _to_number(series: pd.Series) -> pd.Series:
     # Keep digits, sign, and decimal; turn "(123)" into "-123"
@@ -66,13 +66,11 @@ def _to_number(series: pd.Series) -> pd.Series:
 def read_sheet(path, sheet):
     raw = pd.read_excel(path, sheet_name=sheet, header=None, dtype=str, engine=None)
     if raw.empty:
-        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_usd",
-                                     "source_file", "sheet_name", "excel_row"])
+        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"])
 
     hdr = find_header_row(raw)
     if hdr is None:
-        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_usd",
-                                     "source_file", "sheet_name", "excel_row"])
+        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"])
 
     # set header and slice data rows
     cols = raw.iloc[hdr].tolist()
@@ -84,7 +82,7 @@ def read_sheet(path, sheet):
     type_col  = None
     client_col = None
     fee_col = None
-    currency_col = None
+    # currency_col = None
 
     for c in data.columns:
         nc = normalize(c)
@@ -95,14 +93,13 @@ def read_sheet(path, sheet):
         if client_col is None and nc == "client":
             client_col = c
         # detect fee & currency
-        if fee_col is None and (nc in FEE_ALIASES_USD or nc in FEE_ALIASES_GENERIC):
+        if fee_col is None and 'grossfeeyet' in nc and 'usd' in nc:
             fee_col = c
-        if currency_col is None and nc in {"currency", "curr"}:
-            currency_col = c
+        # if currency_col is None and nc in {"currency", "curr"}:
+        #     currency_col = c
 
     if title_col is None:
-        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_usd",
-                                     "source_file", "sheet_name", "excel_row"])
+        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"])
 
     out = pd.DataFrame()
     out["project_title"] = data[title_col].astype(str).str.strip()
@@ -112,25 +109,25 @@ def read_sheet(path, sheet):
     # keep non-empty titles only
     out = out[out["project_title"].replace({"": None, "nan": None}).notna()]
 
-    # provenance; Excel’s visible row number = header_row + 2 + df index
-    out["excel_row"]   = out.index + (hdr + 2)
-    out["source_file"] = os.path.basename(path)
-    out["sheet_name"]  = sheet
+    # # provenance; Excel’s visible row number = header_row + 2 + df index
+    # out["excel_row"]   = out.index + (hdr + 2)
+    # out["source_file"] = os.path.basename(path)
+    # out["sheet_name"]  = sheet
 
-    # --- NEW: derive numeric Project Value in USD
-    out["gross_fee_usd"] = np.nan
-    if fee_col is not None:
-        fees = _to_number(data[fee_col])
-        fee_name_norm = normalize(fee_col)
-        if ("usd" in fee_name_norm) or (fee_name_norm in FEE_ALIASES_USD):
-            out["gross_fee_usd"] = fees
-        elif currency_col is not None:
-            curr = data[currency_col].astype(str).str.upper()
-            is_usd = curr.str.contains("USD") | curr.str.contains("US$")
-            out["gross_fee_usd"] = fees.where(is_usd, np.nan)
-        else:
-            # Currency unknown: keep numeric value (you can change to np.nan if you want strict USD only)
-            out["gross_fee_usd"] = fees
+    fees = _to_number(data[fee_col])
+    out["gross_fee_yet_earned_usd"] = fees
+    # if fee_col is not None:
+        
+    #     fee_name_norm = normalize(fee_col)
+    #     if ("usd" in fee_name_norm) or (fee_name_norm in FEE_ALIASES_USD):
+    #         out["gross_fee_usd"] = fees
+    #     elif currency_col is not None:
+    #         curr = data[currency_col].astype(str).str.upper()
+    #         is_usd = curr.str.contains("USD") | curr.str.contains("US$")
+    #         out["gross_fee_usd"] = fees.where(is_usd, np.nan)
+    #     else:
+    #         # Currency unknown: keep numeric value (you can change to np.nan if you want strict USD only)
+    #         out["gross_fee_usd"] = fees
 
     return out
 
@@ -138,8 +135,7 @@ def read_file(path):
     try:
         xl = pd.ExcelFile(path, engine=None)
     except Exception:
-        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_usd",
-                                     "source_file", "sheet_name", "excel_row"])
+        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"])
     frames = []
     for s in xl.sheet_names:
         try:
@@ -147,8 +143,7 @@ def read_file(path):
         except Exception:
             continue
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(
-        columns=["project_title", "project_type", "client", "gross_fee_usd",
-                 "source_file", "sheet_name", "excel_row"]
+        columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"]
     )
 
 def extract_all(input_dir=INPUT_DIR):
@@ -158,6 +153,5 @@ def extract_all(input_dir=INPUT_DIR):
             if os.path.splitext(f)[1].lower() in VALID_EXTS:
                 dfs.append(read_file(os.path.join(root, f)))
     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(
-        columns=["project_title", "project_type", "client", "gross_fee_usd",
-                 "source_file", "sheet_name", "excel_row"]
+        columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"]
     )
