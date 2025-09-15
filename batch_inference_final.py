@@ -137,7 +137,7 @@ def export_excel(df):
     output = BytesIO()
     # Define display/export order
     cols = []
-    for c in ["project_title","client","gross_fee_usd","project_type","predicted_label","confidence","prediction_status"]:
+    for c in ["project_title","client","gross_fee_yet_earned_usd","project_type","predicted_label","confidence","prediction_status"]:
         if c in df.columns: cols.append(c)
     pd.DataFrame(df, columns=cols).to_excel(output, index=False)
     return output.getvalue()
@@ -366,7 +366,7 @@ def main():
             # Generic numeric filter for any other numeric columns
             num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             g1,g2,g3 = st.columns([2,1.5,1.5])
-            with g1: val_col = st.selectbox("Filter by value column:", ["None"] + num_cols, key="value_col")
+            with g1: val_col = st.selectbox("Filter by value column:", num_cols, key="value_col")
             min_value = max_value = 0.0
             if val_col != "None":
                 with g2:
@@ -392,7 +392,7 @@ def main():
 
             # Display
             cols = ['project_title','client']
-            if 'gross_fee_usd' in filtered.columns: cols.append('gross_fee_usd')
+            if 'gross_fee_yet_earned_usd' in filtered.columns: cols.append('gross_fee_yet_earned_usd')
             if 'project_type' in filtered.columns: filtered['manual_input'] = filtered['project_type']; cols.append('manual_input')
             cols += ['predicted_label','confidence','prediction_status']
             if 'manual_input' in filtered.columns:
@@ -401,20 +401,20 @@ def main():
 
             show = filtered[cols].copy()
             fmt = {'confidence':'{:.1%}'}
-            if 'gross_fee_usd' in show.columns: fmt['gross_fee_usd'] = '{:,.0f}'
-            table = show.head(500).style.applymap(style_confidence, subset=['confidence']).format(fmt)
+            if 'gross_fee_yet_earned_usd' in show.columns: fmt['gross_fee_yet_earned_usd'] = '{:,.0f}'
+            table = show.style.applymap(style_confidence, subset=['confidence']).format(fmt)
 
             st.dataframe(table, use_container_width=True, height=420, column_config={
                 'project_title': st.column_config.TextColumn('Project Title', width='large'),
                 'client': st.column_config.TextColumn('Client', width='medium'),
-                'gross_fee_usd': st.column_config.NumberColumn('Gross Fee (USD)'),
+                'gross_fee_yet_earned_usd': st.column_config.NumberColumn('Gross Fee Yet To Be Earned (USD)'),
                 'manual_input': st.column_config.TextColumn('Manual Input', width='medium'),
                 'predicted_label': st.column_config.TextColumn('Prediction', width='medium'),
                 'confidence': st.column_config.TextColumn('Confidence', width='small'),
                 'prediction_status': st.column_config.TextColumn('Status', width='medium'),
                 'match': st.column_config.TextColumn('Match', width='small')
             })
-            st.caption(f"Showing {min(500, len(filtered))} of {len(filtered)} results")
+            st.caption(f"Showing {len(filtered)} of {len(df)} results")
 
             # Export
             st.markdown("### Export Options")
