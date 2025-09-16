@@ -328,40 +328,6 @@ def main():
             with s3: conf_filter = st.selectbox("Confidence", ["All","90%+","80%+","70%+","Below 70%"], key="conf")
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # Project Value
-            # pv_mask = None
-            # if 'gross_fee_usd' in df.columns and df['gross_fee_usd'].notna().any():
-            #     with st.expander("Project Value (Gross Fee, USD)", expanded=True):
-            #         series = df['gross_fee_usd'].dropna()
-            #         pv_min, pv_max = float(series.min()), float(series.max())
-            #         q1, q99 = float(series.quantile(0.01)), float(series.quantile(0.99))
-            #         mode = st.radio("Mode", ["Range","Custom bands"], horizontal=True, key="pv_mode")
-
-            #         if mode == "Range":
-            #             lo, hi = st.slider("Value range (USD)", min_value=float(q1), max_value=float(q99),
-            #                                value=(float(q1), float(q99)), step=1.0, key="pv_range")
-            #             c1,c2 = st.columns(2)
-            #             with c1: exact_min = st.number_input("Min (exact)", min_value=pv_min, max_value=pv_max, value=lo, key="pv_exact_min")
-            #             with c2: exact_max = st.number_input("Max (exact)", min_value=pv_min, max_value=pv_max, value=hi, key="pv_exact_max")
-            #             pv_mask = (df['gross_fee_usd'] >= exact_min) & (df['gross_fee_usd'] <= exact_max)
-            #         else:
-            #             bands = st.number_input("Number of bands", 1, 5, 3, key="pv_bands")
-            #             masks = []
-            #             for i in range(int(bands)):
-            #                 b1,b2,b3 = st.columns([1,1,1])
-            #                 with b1: bmin = st.number_input(f"Band {i+1} min", pv_min, pv_max, float(series.quantile(max(0.0, 0.2*i))), key=f"pv_bmin_{i}")
-            #                 with b2: bmax = st.number_input(f"Band {i+1} max", pv_min, pv_max, float(series.quantile(min(1.0, 0.2*(i+1)))), key=f"pv_bmax_{i}")
-            #                 with b3: use  = st.checkbox(f"Use Band {i+1}", value=True, key=f"pv_bactive_{i}")
-            #                 if use and bmin <= bmax: masks.append((df['gross_fee_usd'] >= bmin) & (df['gross_fee_usd'] <= bmax))
-            #             if masks:
-            #                 m = masks[0]
-            #                 for mm in masks[1:]: m = m | mm
-            #                 pv_mask = m
-            #             else:
-            #                 pv_mask = None
-
-            #         st.dataframe(series.describe(percentiles=[.1,.25,.5,.75,.9]).to_frame(name="USD"),
-            #                      use_container_width=True)
 
             # Generic numeric filter for any other numeric columns
             num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
