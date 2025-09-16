@@ -8,9 +8,14 @@ import numpy as np
 # ========== USER CONFIG ==========
 INPUT_DIR = "data"   # folder with your Excel files
 VALID_EXTS = {".xlsx", ".xlsm", ".xls"}  # add .xlsb if needed (requires pyxlsb)
-TITLE_STD = "ProjectTitle"
-TYPE_STD  = "ProjectType"
 SCAN_ROWS = 20  # how many rows to search for header
+TARGET_COLUMNS = [
+        'JobNumber', 'Office', 'Office (Div)', 'ProjectTitle', 'Client', 
+        'Location (Country)', 'Gross Fee (USD)', 'Fee Earned (USD)', 
+        'Gross Fee Yet To Be Earned (USD)', 'Currency', 'GrossFee', 
+        'GrossFeeEarned', 'GrossFeeYetToBeEarned', 'Status', 'NewProject', 
+        'StartDate', 'Anticipated EndDate', 'ProjectType'
+    ]
 # =================================
 
 def list_excel_files(folder: str, exts=VALID_EXTS) -> List[str]:
@@ -45,16 +50,9 @@ def find_header_row(df_no_header):
     max_r = min(len(df_no_header), SCAN_ROWS)
     for r in range(max_r):
         row = [normalize(v) for v in df_no_header.iloc[r].tolist()]
-        if "client" in row and "currency" in row:
+        if "jobnumber" in row and "currency" in row:
             return r
     return None  # not found
-
-# --- NEW: aliases + parser for Project Value (Gross Fee, USD)
-# FEE_ALIASES_USD = {
-#     "grossfeeusd", "projectvalueusd", "contractvalueusd", "feeusd",
-#     "grossfeesusd", "grossfeeinusd", "grossfeeus$", "grossfee$", "usdfee"
-# }
-# FEE_ALIASES_GENERIC = {"grossfee", "projectvalue", "contractvalue", "fee"}
 
 def _to_number(series: pd.Series) -> pd.Series:
     # Keep digits, sign, and decimal; turn "(123)" into "-123"
@@ -65,86 +63,76 @@ def _to_number(series: pd.Series) -> pd.Series:
 
 def read_sheet(path, sheet):
     raw = pd.read_excel(path, sheet_name=sheet, header=None, dtype=str, engine=None)
+    print(f"Processing sheet : {sheet}")
     if raw.empty:
-        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"])
+        return pd.DataFrame()
 
     hdr = find_header_row(raw)
+    print(hdr)
     if hdr is None:
-        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"])
+        print(f"no headers found for {sheet} - skipping..")
+        return pd.DataFrame()
 
     # set header and slice data rows
     cols = raw.iloc[hdr].tolist()
     data = raw.iloc[hdr+1:].reset_index(drop=True)
     data.columns = cols
-
-    # find title/type/client columns
-    title_col = None
-    type_col  = None
-    client_col = None
-    fee_col = None
-    # currency_col = None
-
-    for c in data.columns:
-        nc = normalize(c)
-        if title_col is None and nc == "projecttitle":
-            title_col = c
-        if type_col is None and nc == "projecttype":
-            type_col = c
-        if client_col is None and nc == "client":
-            client_col = c
-        # detect fee & currency
-        if fee_col is None and 'grossfeeyet' in nc and 'usd' in nc:
-            fee_col = c
-        # if currency_col is None and nc in {"currency", "curr"}:
-        #     currency_col = c
-
-    if title_col is None:
-        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"])
+    print(f"Columns in sheet {sheet} : {cols}")
 
     out = pd.DataFrame()
-    out["project_title"] = data[title_col].astype(str).str.strip()
-    out["project_type"]  = data[type_col].astype(str).str.strip() if type_col in data.columns else None
-    out["client"]        = data[client_col].astype(str).str.strip() if client_col in data.columns else None
+    
+    # Map each target column to the actual column in the data
+    for target_col in TARGET_COLUMNS:
+        if target_col in data.columns:
+            out[target_col] = data[target_col]
+            print(f"✓ Found: {target_col}")
+        else:
+            print(f"✗ Missing: {target_col}")
+    
+    # Ensure the DataFrame has ONLY the target columns in the exact order
+    out = out[TARGET_COLUMNS]
+    
+    # Filter out rows with empty ProjectTitle
+    if 'ProjectTitle' in out.columns and not out['ProjectTitle'].isna().all():
+        valid_mask = out['ProjectTitle'].astype(str).str.strip().replace({"": None, "nan": None}).notna()
+        out = out[valid_mask].reset_index(drop=True)
+    else:
+        print("No ProjectTitle column or all values are empty - returning empty DataFrame")
+        return pd.DataFrame(columns=TARGET_COLUMNS)
+    
+    if out.empty:
+        print(f"No valid data found in {sheet}")
+        return pd.DataFrame(columns=TARGET_COLUMNS)
 
-    # keep non-empty titles only
-    out = out[out["project_title"].replace({"": None, "nan": None}).notna()]
+    # Convert numeric columns
+    numeric_columns = [
+        'Gross Fee (USD)', 'Fee Earned (USD)', 'Gross Fee Yet To Be Earned (USD)',
+        'GrossFee', 'GrossFeeEarned', 'GrossFeeYetToBeEarned'
+    ]
+    
+    for col in numeric_columns:
+        if col in out.columns and not out[col].isna().all():
+            try:
+                out[col] = _to_number(out[col])
+            except:
+                pass  # Keep as string if conversion fails
 
-    # # provenance; Excel’s visible row number = header_row + 2 + df index
-    # out["excel_row"]   = out.index + (hdr + 2)
-    # out["source_file"] = os.path.basename(path)
-    # out["sheet_name"]  = sheet
-
-    fees = _to_number(data[fee_col])
-    out["gross_fee_yet_earned_usd"] = fees
-    # if fee_col is not None:
-        
-    #     fee_name_norm = normalize(fee_col)
-    #     if ("usd" in fee_name_norm) or (fee_name_norm in FEE_ALIASES_USD):
-    #         out["gross_fee_usd"] = fees
-    #     elif currency_col is not None:
-    #         curr = data[currency_col].astype(str).str.upper()
-    #         is_usd = curr.str.contains("USD") | curr.str.contains("US$")
-    #         out["gross_fee_usd"] = fees.where(is_usd, np.nan)
-    #     else:
-    #         # Currency unknown: keep numeric value (you can change to np.nan if you want strict USD only)
-    #         out["gross_fee_usd"] = fees
-
+    print(f"Successfully processed {sheet}: {len(out)} rows")
     return out
 
 def read_file(path):
     try:
         xl = pd.ExcelFile(path, engine=None)
     except Exception:
-        return pd.DataFrame(columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"])
+        print("Could not read file")
+        return pd.DataFrame()
     frames = []
     for s in xl.sheet_names:
         try:
             frames.append(read_sheet(path, s))
         except Exception:
             continue
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(
-        columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"]
-    )
+    return pd.concat(frames, ignore_index=True)
 
 def extract_all(input_dir=INPUT_DIR):
     dfs = []
@@ -152,6 +140,4 @@ def extract_all(input_dir=INPUT_DIR):
         for f in files:
             if os.path.splitext(f)[1].lower() in VALID_EXTS:
                 dfs.append(read_file(os.path.join(root, f)))
-    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(
-        columns=["project_title", "project_type", "client", "gross_fee_yet_earned_usd"]
-    )
+    return pd.concat(dfs, ignore_index=True)
