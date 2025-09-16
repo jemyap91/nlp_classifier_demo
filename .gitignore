@@ -13,6 +13,7 @@ cache/
 results/
 logs/
 distilbert_project_types/
+data/
 # my_finetuned_classifier/
 
 # Large model/data files
