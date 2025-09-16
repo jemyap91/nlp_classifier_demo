@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from transformers import AutoConfig, AutoTokenizer, AutoModelForSequenceClassification
 import plotly.graph_objects as go
 
-from data_extraction import read_file as original_read_file  # unchanged, fast vectorized ingest
+from data_extraction import read_file as original_read_file
 
 # ==================== CONFIG ====================
 CKPT_DIR = "./my_finetuned_classifier"
@@ -40,6 +40,14 @@ CLASS_MAPPING = {
     'Community & Instituitional': 'Community & Institutional',
     'Community & Institutional': 'Community & Institutional'
 }
+
+TARGET_COLUMNS = [
+    'JobNumber', 'Office', 'Office (Div)', 'ProjectTitle', 'Client', 
+    'Location (Country)', 'Gross Fee (USD)', 'Fee Earned (USD)', 
+    'Gross Fee Yet To Be Earned (USD)', 'Currency', 'GrossFee', 
+    'GrossFeeEarned', 'GrossFeeYetToBeEarned', 'Status', 'NewProject', 
+    'StartDate', 'Anticipated EndDate', 'ProjectType'
+]
 
 # ==================== PAGE CONFIG + THEME ====================
 st.set_page_config(page_title="Batch Inference System", layout="wide", initial_sidebar_state="collapsed")
@@ -134,12 +142,21 @@ def load_backend():
 
 # ==================== UTILS ====================
 def export_excel(df):
+    # output = BytesIO()
+    # # Define display/export order
+    # cols = []
+    # for c in ["project_title","client","gross_fee_yet_earned_usd","project_type","predicted_label","confidence","prediction_status"]:
+    #     if c in df.columns: cols.append(c)
+    # pd.DataFrame(df, columns=cols).to_excel(output, index=False)
+    # return output.getvalue()
     output = BytesIO()
-    # Define display/export order
-    cols = []
-    for c in ["project_title","client","gross_fee_yet_earned_usd","project_type","predicted_label","confidence","prediction_status"]:
-        if c in df.columns: cols.append(c)
-    pd.DataFrame(df, columns=cols).to_excel(output, index=False)
+    # Export all available TARGET_COLUMNS plus prediction columns
+    export_cols = [col for col in TARGET_COLUMNS if col in df.columns]
+    export_cols += ['predicted_label', 'confidence', 'prediction_status']
+    if 'match' in df.columns:
+        export_cols.append('match')
+    
+    df[export_cols].to_excel(output, index=False)
     return output.getvalue()
 
 def style_confidence(val):
@@ -234,6 +251,7 @@ def predict_fast(texts, bk):
 
 # ==================== APP ====================
 def main():
+    global TARGET_COLUMNS
     st.title("Batch Inference System")
     status = st.empty()
 
@@ -264,14 +282,14 @@ def main():
                 t0 = time.time()
                 with st.status("Processing files…", expanded=False) as st_status:
                     df = pd.concat([original_read_file(_tmpfile(f)) for f in uploaded], ignore_index=True) if uploaded else pd.DataFrame()
-                    if df.empty or 'project_title' not in df.columns:
+                    if df.empty:
                         st_status.update(label="No valid data found", state="error")
                         st.session_state.pop('processing', None); return
 
                     # Clean text
-                    df['client'] = df.get('client','').fillna('').astype(str).str.strip()
-                    df['project_title'] = df['project_title'].fillna('').astype(str).str.strip()
-                    df['text'] = (df['project_title'] + ' ' + df['client']).str.strip()
+                    df['Client'] = df['Client'].fillna('').astype(str).str.strip()
+                    df['ProjectTitle'] = df['ProjectTitle'].fillna('').astype(str).str.strip()
+                    df['text'] = (df['ProjectTitle'] + ' ' + df['Client']).str.strip()
                     df = df[df['text'].str.len() > 0].copy()
 
                     st_status.update(label=f"Classifying {len(df):,} rows…", state="running")
@@ -343,7 +361,7 @@ def main():
             # Apply filters (O(n))
             filtered = df.copy()
             if search:
-                mask = filtered['project_title'].str.contains(search, case=False, na=False) | filtered['client'].str.contains(search, case=False, na=False)
+                mask = filtered['ProjectTitle'].str.contains(search, case=False, na=False) | filtered['Client'].str.contains(search, case=False, na=False)
                 filtered = filtered[mask]
             if type_filter != "All Types":
                 filtered = filtered[filtered['predicted_label']==type_filter]
@@ -356,30 +374,90 @@ def main():
             if val_col != "None":
                 filtered = filtered[(filtered[val_col] >= min_value) & (filtered[val_col] <= max_value)]
 
-            # Display
-            cols = ['project_title','client']
-            if 'gross_fee_yet_earned_usd' in filtered.columns: cols.append('gross_fee_yet_earned_usd')
-            if 'project_type' in filtered.columns: filtered['manual_input'] = filtered['project_type']; cols.append('manual_input')
-            cols += ['predicted_label','confidence','prediction_status']
-            if 'manual_input' in filtered.columns:
-                filtered['match'] = (filtered['manual_input'] == filtered['predicted_label']).map({True:'✓', False:'✗'})
-                cols.append('match')
+       # Display columns - create a local copy to avoid modifying global
+            display_columns = TARGET_COLUMNS.copy()
+            
+            # Add prediction columns
+            display_columns += ['predicted_label', 'confidence', 'prediction_status']
+            
+            # Add match column if ProjectType exists
+            if 'ProjectType' in filtered.columns:
+                filtered['match'] = (filtered['ProjectType'] == filtered['predicted_label']).map({True:'✓', False:'✗'})
+                display_columns.append('match')
 
-            show = filtered[cols].copy()
-            fmt = {'confidence':'{:.1%}'}
-            if 'gross_fee_yet_earned_usd' in show.columns: fmt['gross_fee_yet_earned_usd'] = '{:,.0f}'
-            table = show.style.applymap(style_confidence, subset=['confidence']).format(fmt)
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_display_columns = []
+            for col in display_columns:
+                if col not in seen and col in filtered.columns:
+                    seen.add(col)
+                    unique_display_columns.append(col)
 
-            st.dataframe(table, use_container_width=True, height=420, column_config={
-                'project_title': st.column_config.TextColumn('Project Title', width='large'),
-                'client': st.column_config.TextColumn('Client', width='medium'),
-                'gross_fee_yet_earned_usd': st.column_config.NumberColumn('Gross Fee Yet To Be Earned (USD)'),
-                'manual_input': st.column_config.TextColumn('Manual Input', width='medium'),
+            show = filtered[unique_display_columns].copy()
+
+           # Convert numeric columns to proper format
+            numeric_columns = [
+                'Gross Fee (USD)', 'Fee Earned (USD)', 'Gross Fee Yet To Be Earned (USD)',
+                'GrossFee', 'GrossFeeEarned', 'GrossFeeYetToBeEarned'
+            ]
+
+            for col in numeric_columns:
+                if col in show.columns:
+                    # Convert to numeric, replacing any non-numeric values with 0
+                    show[col] = pd.to_numeric(show[col], errors='coerce').fillna(0)
+            
+            # Format dictionary for styling
+            fmt = {'confidence': '{:.1%}'}
+            for col in numeric_columns:
+                if col in show.columns:
+                    fmt[col] = '{:,.0f}'
+            
+            # Use .map instead of deprecated .applymap
+            table = show.style.map(style_confidence, subset=['confidence']).format(fmt)
+
+            # Comprehensive column configuration for all possible columns
+            column_config = {
+                # Job Information
+                'JobNumber': st.column_config.TextColumn('Job Number', width='small'),
+                'Office': st.column_config.TextColumn('Office', width='small'),
+                'Office (Div)': st.column_config.TextColumn('Office (Div)', width='small'),
+                
+                # Project Details
+                'ProjectTitle': st.column_config.TextColumn('Project Title', width='large'),
+                'Client': st.column_config.TextColumn('Client', width='medium'),
+                'Location (Country)': st.column_config.TextColumn('Location', width='medium'),
+                
+                # Financial Information
+                'Gross Fee (USD)': st.column_config.NumberColumn('Gross Fee (USD)', format="$%d"),
+                'Fee Earned (USD)': st.column_config.NumberColumn('Fee Earned (USD)', format="$%d"),
+                'Gross Fee Yet To Be Earned (USD)': st.column_config.NumberColumn('Gross Fee Yet To Be Earned (USD)', format="$%d"),
+                'GrossFee': st.column_config.NumberColumn('Gross Fee', format="$%d"),
+                'GrossFeeEarned': st.column_config.NumberColumn('Fee Earned', format="$%d"),
+                'GrossFeeYetToBeEarned': st.column_config.NumberColumn('Fee Yet To Be Earned', format="$%d"),
+                'Currency': st.column_config.TextColumn('Currency', width='small'),
+                
+                # Project Status
+                'Status': st.column_config.TextColumn('Status', width='medium'),
+                'NewProject': st.column_config.TextColumn('New Project', width='small'),
+                
+                # Dates
+                'StartDate': st.column_config.DateColumn('Start Date'),
+                'Anticipated EndDate': st.column_config.DateColumn('End Date'),
+                
+                # Classification
+                'ProjectType': st.column_config.TextColumn('Manual Input', width='medium'),
                 'predicted_label': st.column_config.TextColumn('Prediction', width='medium'),
                 'confidence': st.column_config.TextColumn('Confidence', width='small'),
                 'prediction_status': st.column_config.TextColumn('Status', width='medium'),
                 'match': st.column_config.TextColumn('Match', width='small')
-            })
+            }
+            
+            st.dataframe(
+                table, 
+                use_container_width=True, 
+                height=420, 
+                column_config=column_config
+            )
             st.caption(f"Showing {len(filtered)} of {len(df)} results")
 
             # Export
