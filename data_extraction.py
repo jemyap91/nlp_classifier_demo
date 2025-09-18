@@ -68,17 +68,37 @@ def read_sheet(path, sheet):
         return pd.DataFrame()
 
     hdr = find_header_row(raw)
-    print(hdr)
     if hdr is None:
         print(f"no headers found for {sheet} - skipping..")
         return pd.DataFrame()
 
     # set header and slice data rows
     cols = raw.iloc[hdr].tolist()
+    
+    # Clean up na column names and duplicates
+    cleaned_cols = []
+    seen_cols = {}
+    
+    for i, col in enumerate(cols):
+        # Handle None/NaN/empty columns
+        if col is None or (isinstance(col, float) and pd.isna(col)) or str(col).strip() == '':
+            clean_col = f"unnamed_col_{i}"
+        else:
+            clean_col = str(col).strip()
+        
+        # Handle duplicates by appending suffix
+        if clean_col in seen_cols:
+            seen_cols[clean_col] += 1
+            clean_col = f"{clean_col}_duplicate_{seen_cols[clean_col]}"
+        else:
+            seen_cols[clean_col] = 0
+        
+        cleaned_cols.append(clean_col)
+    
     data = raw.iloc[hdr+1:].reset_index(drop=True)
-    data.columns = cols
-    print(f"Columns in sheet {sheet} : {cols}")
-
+    data.columns = cleaned_cols  # Use cleaned column names
+    
+    print(f"Columns in sheet {sheet} : {cleaned_cols}")
     out = pd.DataFrame()
     
     # Map each target column to the actual column in the data
@@ -90,15 +110,16 @@ def read_sheet(path, sheet):
             print(f"✗ Missing: {target_col}")
     
     # Ensure the DataFrame has ONLY the target columns in the exact order
-    out = out[TARGET_COLUMNS]
+    out = out.reindex(columns=TARGET_COLUMNS)
     
     # Filter out rows with empty ProjectTitle
-    if 'ProjectTitle' in out.columns and not out['ProjectTitle'].isna().all():
-        valid_mask = out['ProjectTitle'].astype(str).str.strip().replace({"": None, "nan": None}).notna()
-        out = out[valid_mask].reset_index(drop=True)
-    else:
-        print("No ProjectTitle column or all values are empty - returning empty DataFrame")
-        return pd.DataFrame(columns=TARGET_COLUMNS)
+    # if 'ProjectTitle' in out.columns and not out['ProjectTitle'].isna().all():
+    #     valid_mask = out['ProjectTitle'].astype(str).str.strip().replace({"": None, "nan": None}).notna()
+    #     out = out[valid_mask].reset_index(drop=True)
+
+    # else:
+    #     print("No ProjectTitle column or all values are empty - returning empty DataFrame")
+    #     return pd.DataFrame(columns=TARGET_COLUMNS)
     
     if out.empty:
         print(f"No valid data found in {sheet}")
