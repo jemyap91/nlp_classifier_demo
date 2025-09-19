@@ -69,3 +69,4 @@ data/
 # Training scripts (not needed for inference)
 DistilBert.py
 data_extraction_model_training.py
+appdemo_optimized.py
