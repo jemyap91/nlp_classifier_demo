@@ -20,6 +20,6 @@ data/
 *.parquet
 *.pt
 *.bin
-*.safetensors
+# *.safetensors
 *.csv   # <-- this keeps your big CSVs out of the repo
 my_finetuned_classifier/model.onnx
