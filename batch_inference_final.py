@@ -249,15 +249,30 @@ def predict_fast(texts, bk):
     all_scores = [scores_store[c] for c in codes]
     return all_preds, all_scores
 
+
+def get_system_status(bk):
+    """Get detailed system status including GPU information"""
+    if torch.cuda.is_available():
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # GB
+        backend_type = bk['backend'].upper()
+        return f"GPU: {gpu_name} ({gpu_memory:.0f}GB) / {backend_type}"
+    else:
+        return "CPU Processing"
+    
 # ==================== APP ====================
 def main():
     global TARGET_COLUMNS
     st.title("Batch Inference System")
     status = st.empty()
 
-    with st.spinner("Initializing model…"):
+    with st.spinner("Initializing modelâ€¦"):
         bk = load_backend()
-    status.caption(f"System Status: {'GPU / ONNX' if bk['backend']=='onnx' and torch.cuda.is_available() else ('GPU / PyTorch' if torch.cuda.is_available() else 'CPU Processing')}")
+    status.caption(f"System Status: {get_system_status(bk)}")
+    
+    # with st.spinner("Initializing model…"):
+    #     bk = load_backend()
+    # status.caption(f"System Status: {'GPU / ONNX' if bk['backend']=='onnx' and torch.cuda.is_available() else ('GPU / PyTorch' if torch.cuda.is_available() else 'CPU Processing')}")
 
     tab1, tab2 = st.tabs(["Batch Processing", "Configuration"])
 
