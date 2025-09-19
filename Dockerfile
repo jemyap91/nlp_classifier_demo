@@ -41,5 +41,5 @@ USER app
 EXPOSE 8501
 
 # Run the application
-CMD ["streamlit", "run", "appdemo_optimized.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
+CMD ["streamlit", "run", "batch_inference_final.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
  
