@@ -263,13 +263,14 @@ def get_system_status(bk):
 # ==================== APP ====================
 def main():
     global TARGET_COLUMNS
-    st.title("Batch Inference System")
+    st.title("Orderbook Classifier System")
     status = st.empty()
 
+    # st.write("Hello World")
     with st.spinner("Initializing modelâ€¦"):
         bk = load_backend()
     status.caption(f"System Status: {get_system_status(bk)}")
-    
+
     # with st.spinner("Initializing model…"):
     #     bk = load_backend()
     # status.caption(f"System Status: {'GPU / ONNX' if bk['backend']=='onnx' and torch.cuda.is_available() else ('GPU / PyTorch' if torch.cuda.is_available() else 'CPU Processing')}")

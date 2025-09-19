@@ -62,10 +62,10 @@ build_and_push() {
     echo "✓ Build and push completed successfully"
 }
  
+
 # Step 4: Verify
 verify_deployment() {
     print_section "STEP 4: Verification"
-    
     echo "Verifying image in ACR..."
     if az acr repository show --name "$ACR_NAME" --image "$IMAGE_NAME:$IMAGE_TAG" >/dev/null 2>&1; then
         echo "✓ Image successfully pushed to ACR"
@@ -73,6 +73,16 @@ verify_deployment() {
     else
         echo "Warning: Could not verify image in ACR"
     fi
+}
+
+# Step 5: Update Azure Container App
+update_container_app() {
+    print_section "STEP 5: Update Azure Container App"
+    echo "Updating Azure Container App: financeclassifier-fast to use new image..."
+    run_command "az containerapp update --name finance-classifier-update --resource-group finance-adb-rg --image $ACR_URL/$IMAGE_NAME:$IMAGE_TAG"
+    # run_command "az containerapp revision restart --name finance-classifier-update --resource-group finance-adb-rg"
+    # az container restart -g="XXX" -n="XXX"
+    echo "✓ Azure Container App updated successfully"
 }
  
 # Main deployment pipeline
@@ -94,7 +104,10 @@ main() {
     
     # Step 4: Verify
     verify_deployment
-    
+
+    # Step 5: Update Azure Container App
+    update_container_app
+
     print_section "DEPLOYMENT COMPLETED SUCCESSFULLY!"
     echo "Your image is ready at: $ACR_URL/$IMAGE_NAME:$IMAGE_TAG"
 }
