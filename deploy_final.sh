@@ -78,7 +78,7 @@ verify_deployment() {
 # Step 5: Update Azure Container App
 update_container_app() {
     print_section "STEP 5: Update Azure Container App"
-    echo "Updating Azure Container App: financeclassifier-fast to use new image..."
+    echo "Updating Azure Container App: finance-classifier-fast to use new image..."
     run_command "az containerapp update --name finance-classifier-update --resource-group finance-adb-rg --image $ACR_URL/$IMAGE_NAME:$IMAGE_TAG"
     # run_command "az containerapp revision restart --name finance-classifier-update --resource-group finance-adb-rg"
     # az container restart -g="XXX" -n="XXX"
